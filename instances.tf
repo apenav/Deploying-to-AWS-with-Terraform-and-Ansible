@@ -47,18 +47,22 @@ EOF
 
 #Create EC2 in us-west-2
 resource "aws_instance" "jenkins-worker-oregon" {
-  provider                    = aws.region-worker
-  count                       = var.workers-count
-  ami                         = data.aws_ssm_parameter.linuxAmiOregon.value
-  instance_type               = var.instance-type
-  key_name                    = aws_key_pair.worker-key.key_name
-  associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.jenkins-sg-oregon.id]
-  subnet_id                   = aws_subnet.subnet_1_oregon.id
+
+  triggers = {
+    provider                               = aws.region-worker
+    count                                  = var.workers-count
+    ami                                    = data.aws_ssm_parameter.linuxAmiOregon.value
+    instance_type                          = var.instance-type
+    key_name                               = aws_key_pair.worker-key.key_name
+    associate_public_ip_address            = true
+    vpc_security_group_ids                 = [aws_security_group.jenkins-sg-oregon.id]
+    subnet_id                              = aws_subnet.subnet_1_oregon.id
+    aws_instance_jenkins_master_private_ip = aws_instance.jenkins-master.private_ip
+  }
   provisioner "remote-exec" {
     when = destroy
     inline = [
-      "java -jar /home/ec2-user/jenkins-cli.jar -auth @/home/ec2-user/jenkins_auth -s http://${aws_instance.jenkins-master.private_ip}:8080 -auth @/home/ec2-user/jenkins_auth delete-node ${self.private_ip}"
+      "java -jar /home/ec2-user/jenkins-cli.jar -auth @/home/ec2-user/jenkins_auth -s http://${self.triggers.aws_instance_jenkins_master_private_ip}:8080 -auth @/home/ec2-user/jenkins_auth delete-node ${self.private_ip}"
     ]
     connection {
       type        = "ssh"
